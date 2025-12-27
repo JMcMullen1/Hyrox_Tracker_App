@@ -211,12 +211,12 @@ async function renderActionButtons() {
 
         // Handle template selection from dropdown
         loadMenu?.querySelectorAll('.load-dropdown-item').forEach(item => {
-            item.addEventListener('click', () => {
+            item.addEventListener('click', async () => {
                 const templateId = item.dataset.templateId;
                 const template = categoryTemplates.find(t => t.id === templateId);
                 if (template) {
                     loadMenu.classList.remove('open');
-                    loadTemplateForEditing(template);
+                    await loadTemplateForEditing(template);
                 }
             });
         });
@@ -276,7 +276,7 @@ async function renderTemplates() {
             e.stopPropagation();
             const template = categoryTemplates.find(t => t.id === templateId);
             if (template) {
-                loadTemplateForEditing(template);
+                await loadTemplateForEditing(template);
             }
         });
 
@@ -299,13 +299,14 @@ async function renderTemplates() {
 /**
  * Load a template for editing
  */
-function loadTemplateForEditing(template) {
+async function loadTemplateForEditing(template) {
     editingTemplateId = template.id;
     editingTemplateName = template.name;
     workoutBlocks = deepClone(template.blocks);
     renderBlocksBuilder();
     renderEditingBanner();
-    renderTemplates();
+    await renderTemplates();
+    await renderActionButtons();
     showToast(`Loaded "${template.name}" for editing`, 'success');
 }
 
