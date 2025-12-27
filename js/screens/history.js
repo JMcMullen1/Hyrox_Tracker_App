@@ -9,6 +9,7 @@ import { createResultsView } from '../components/results-card.js';
 import { confirmDelete } from '../components/modal.js';
 import { navigate } from '../router.js';
 import { getCanonicalExerciseId } from '../exercises.js';
+import { setRepeatWorkout } from './custom.js';
 
 let container = null;
 let currentFilter = 'all';
@@ -135,12 +136,22 @@ function renderFilteredList() {
                 </div>
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px;">
                     <span class="history-item-badge ${session.category}">${session.category}</span>
-                    <button class="btn-icon danger" data-action="delete" style="opacity: 0.5;">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                        </svg>
-                    </button>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn-icon" data-action="repeat" title="Repeat this workout" style="opacity: 0.7;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="17 1 21 5 17 9"></polyline>
+                                <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+                                <polyline points="7 23 3 19 7 15"></polyline>
+                                <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+                            </svg>
+                        </button>
+                        <button class="btn-icon danger" data-action="delete" title="Delete workout" style="opacity: 0.5;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
@@ -152,7 +163,17 @@ function renderFilteredList() {
 
         item.addEventListener('click', (e) => {
             if (e.target.closest('[data-action="delete"]')) return;
+            if (e.target.closest('[data-action="repeat"]')) return;
             showSessionDetail(sessionId);
+        });
+
+        item.querySelector('[data-action="repeat"]')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const session = sessions.find(s => s.id === sessionId);
+            if (session) {
+                setRepeatWorkout(session);
+                navigate('custom');
+            }
         });
 
         item.querySelector('[data-action="delete"]')?.addEventListener('click', async (e) => {
@@ -178,17 +199,43 @@ async function showSessionDetail(sessionId) {
 
     container.innerHTML = '';
 
+    // Navigation buttons container
+    const navButtons = document.createElement('div');
+    navButtons.style.cssText = 'display: flex; gap: 8px; margin-bottom: 16px;';
+
     // Back button
     const backBtn = document.createElement('button');
-    backBtn.className = 'btn btn-secondary mb-md';
+    backBtn.className = 'btn btn-secondary';
+    backBtn.style.flex = '1';
     backBtn.innerHTML = `
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="15 18 9 12 15 6"></polyline>
         </svg>
-        Back to History
+        Back
     `;
     backBtn.addEventListener('click', () => renderHistoryList());
-    container.appendChild(backBtn);
+    navButtons.appendChild(backBtn);
+
+    // Repeat button
+    const repeatBtn = document.createElement('button');
+    repeatBtn.className = 'btn btn-primary';
+    repeatBtn.style.flex = '1';
+    repeatBtn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="17 1 21 5 17 9"></polyline>
+            <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+            <polyline points="7 23 3 19 7 15"></polyline>
+            <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+        </svg>
+        Repeat Workout
+    `;
+    repeatBtn.addEventListener('click', () => {
+        setRepeatWorkout(session);
+        navigate('custom');
+    });
+    navButtons.appendChild(repeatBtn);
+
+    container.appendChild(navButtons);
 
     // Session info
     const infoCard = document.createElement('div');
