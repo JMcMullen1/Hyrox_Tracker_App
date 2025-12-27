@@ -3,32 +3,32 @@
  * Handles caching for offline functionality
  */
 
-const CACHE_NAME = 'hyrox-tracker-v1';
+const CACHE_NAME = 'hyrox-tracker-v2';
 
-// Files to cache for offline use
+// Files to cache for offline use (relative paths for subdirectory deployment)
 const STATIC_ASSETS = [
-    '/',
-    '/index.html',
-    '/styles.css',
-    '/manifest.json',
-    '/js/app.js',
-    '/js/router.js',
-    '/js/db.js',
-    '/js/timer.js',
-    '/js/exercises.js',
-    '/js/utils.js',
-    '/js/components/toggle.js',
-    '/js/components/modal.js',
-    '/js/components/workout-block.js',
-    '/js/components/stopwatch.js',
-    '/js/components/results-card.js',
-    '/js/screens/dashboard.js',
-    '/js/screens/full-sim.js',
-    '/js/screens/custom.js',
-    '/js/screens/history.js',
-    '/icons/icon.svg',
-    '/icons/icon-192.png',
-    '/icons/icon-512.png'
+    './',
+    './index.html',
+    './styles.css',
+    './manifest.json',
+    './js/app.js',
+    './js/router.js',
+    './js/db.js',
+    './js/timer.js',
+    './js/exercises.js',
+    './js/utils.js',
+    './js/components/toggle.js',
+    './js/components/modal.js',
+    './js/components/workout-block.js',
+    './js/components/stopwatch.js',
+    './js/components/results-card.js',
+    './js/screens/dashboard.js',
+    './js/screens/full-sim.js',
+    './js/screens/custom.js',
+    './js/screens/history.js',
+    './icons/icon.svg',
+    './icons/icon-192.png',
+    './icons/icon-512.png'
 ];
 
 // Install event - cache static assets
@@ -116,7 +116,7 @@ self.addEventListener('fetch', (event) => {
                     .catch(() => {
                         // Return offline page for navigation requests
                         if (event.request.mode === 'navigate') {
-                            return caches.match('/index.html');
+                            return caches.match('./index.html');
                         }
                         return null;
                     });
