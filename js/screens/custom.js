@@ -135,15 +135,19 @@ async function renderBuilderView() {
     actions.id = 'action-buttons';
     container.appendChild(actions);
 
-    renderActionButtons();
+    await renderActionButtons();
 }
 
 /**
  * Render action buttons based on editing state
  */
-function renderActionButtons() {
+async function renderActionButtons() {
     const actions = document.getElementById('action-buttons');
     if (!actions) return;
+
+    // Get templates for the load dropdown
+    const templates = await getAllWorkoutTemplates();
+    const categoryTemplates = templates.filter(t => t.category === currentCategory);
 
     if (editingTemplateId) {
         // Editing a template - show update and save as new options
@@ -158,15 +162,64 @@ function renderActionButtons() {
         document.getElementById('btn-update-template')?.addEventListener('click', updateTemplate);
         document.getElementById('btn-save-as-new')?.addEventListener('click', saveAsNewTemplate);
     } else {
-        // Not editing - show regular save template option
+        // Not editing - show regular save and load template options
         actions.innerHTML = `
             <div class="stats-grid">
                 <button class="btn btn-secondary" id="btn-save-template">Save Template</button>
-                <button class="btn btn-primary" id="btn-start-custom" ${workoutBlocks.length === 0 ? 'disabled' : ''}>Start Workout</button>
+                <div class="load-dropdown-container">
+                    <button class="btn btn-outline" id="btn-load-template" ${categoryTemplates.length === 0 ? 'disabled' : ''}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Load
+                    </button>
+                    <div class="load-dropdown-menu" id="load-dropdown-menu">
+                        ${categoryTemplates.length === 0 ?
+                            '<div class="load-dropdown-empty">No saved templates</div>' :
+                            categoryTemplates.map(t => `
+                                <button class="load-dropdown-item" data-template-id="${t.id}">
+                                    <span class="load-dropdown-item-name">${sanitizeHTML(t.name)}</span>
+                                    <span class="load-dropdown-item-meta">${t.blocks.length} exercise${t.blocks.length !== 1 ? 's' : ''}</span>
+                                </button>
+                            `).join('')
+                        }
+                    </div>
+                </div>
             </div>
+            <button class="btn btn-primary btn-full mt-md" id="btn-start-custom" ${workoutBlocks.length === 0 ? 'disabled' : ''}>Start Workout</button>
         `;
 
         document.getElementById('btn-save-template')?.addEventListener('click', saveAsTemplate);
+
+        // Load dropdown functionality
+        const loadBtn = document.getElementById('btn-load-template');
+        const loadMenu = document.getElementById('load-dropdown-menu');
+
+        loadBtn?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            loadMenu?.classList.toggle('open');
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.load-dropdown-container')) {
+                loadMenu?.classList.remove('open');
+            }
+        });
+
+        // Handle template selection from dropdown
+        loadMenu?.querySelectorAll('.load-dropdown-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const templateId = item.dataset.templateId;
+                const template = categoryTemplates.find(t => t.id === templateId);
+                if (template) {
+                    loadMenu.classList.remove('open');
+                    loadTemplateForEditing(template);
+                }
+            });
+        });
     }
 
     document.getElementById('btn-start-custom')?.addEventListener('click', startWorkout);
@@ -535,7 +588,7 @@ async function saveAsTemplate() {
 
         await renderTemplates();
         renderEditingBanner();
-        renderActionButtons();
+        await renderActionButtons();
         showToast('Template saved!', 'success');
     }
 }
@@ -608,7 +661,7 @@ async function saveAsNewTemplate() {
 
         await renderTemplates();
         renderEditingBanner();
-        renderActionButtons();
+        await renderActionButtons();
         showToast('Saved as new template!', 'success');
     }
 }
