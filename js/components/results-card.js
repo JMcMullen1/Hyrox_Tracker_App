@@ -20,19 +20,14 @@ export function createResultsView(workout, pbs = {}) {
     // Build cards array
     const cards = [];
 
-    // Card 1: Exercise Times
-    cards.push(createExerciseTimesCard(workout));
-
-    // Card 2: Total Time
+    // Card 1: Total Time
     cards.push(createTotalTimeCard(workout, pbs));
 
-    // Card 3+: PB Comparisons per exercise
-    workout.blocks.forEach((block, index) => {
-        const exerciseId = getCanonicalExerciseId(block, workout.category);
-        if (exerciseId && pbs[exerciseId]) {
-            cards.push(createComparisonCard(block, workout.blockTimesMs[index], pbs[exerciseId], workout.category));
-        }
-    });
+    // Card 2: Full Comparison Table (all exercises vs PBs)
+    cards.push(createComparisonTableCard(workout, pbs));
+
+    // Card 3: Exercise Times (simple list)
+    cards.push(createExerciseTimesCard(workout));
 
     // Current card index
     let currentIndex = 0;
@@ -210,6 +205,81 @@ function createComparisonCard(block, currentTime, pbTime, category) {
             </div>
         </div>
     `;
+    return card;
+}
+
+/**
+ * Create comparison table card for results view
+ * Shows all exercises with current time vs personal best
+ */
+function createComparisonTableCard(workout, pbs) {
+    const card = document.createElement('div');
+    card.className = 'comparison-table-card';
+
+    // Calculate totals
+    const totalCurrent = workout.totalTimeMs;
+    const totalPB = Object.values(pbs).reduce((sum, pb) => {
+        // Only sum exercise PBs, not full_sim_total
+        if (typeof pb === 'number') return sum + pb;
+        return sum;
+    }, 0);
+    const simPB = pbs['full_sim_total'];
+
+    // Calculate summary stats
+    let fasterCount = 0;
+    let slowerCount = 0;
+    let newPBCount = 0;
+
+    workout.blocks.forEach((block, index) => {
+        const exerciseId = getCanonicalExerciseId(block, workout.category);
+        const pbTime = exerciseId ? pbs[exerciseId] : null;
+        const currentTime = workout.blockTimesMs[index];
+
+        if (pbTime) {
+            if (currentTime < pbTime) {
+                fasterCount++;
+                newPBCount++;
+            } else if (currentTime > pbTime) {
+                slowerCount++;
+            }
+        }
+    });
+
+    card.innerHTML = `
+        <div class="results-card-title">Exercise Comparison</div>
+        <div class="comparison-summary">
+            ${newPBCount > 0 ? `<span class="summary-badge new-pb">🏆 ${newPBCount} New PB${newPBCount > 1 ? 's' : ''}</span>` : ''}
+            <span class="summary-badge faster">${fasterCount} Faster</span>
+            <span class="summary-badge slower">${slowerCount} Slower</span>
+        </div>
+        <div class="comparison-table-scroll">
+            <div class="comparison-table">
+                <div class="comparison-row header">
+                    <span>Exercise</span>
+                    <span>Time</span>
+                    <span>PB</span>
+                    <span>+/-</span>
+                </div>
+                ${workout.blocks.map((block, index) => {
+                    const exerciseId = getCanonicalExerciseId(block, workout.category);
+                    const pbTime = exerciseId ? pbs[exerciseId] : null;
+                    const currentTime = workout.blockTimesMs[index];
+                    const delta = pbTime ? calculateDelta(currentTime, pbTime) : { formatted: '-', type: 'neutral' };
+                    const isNewPB = pbTime && currentTime < pbTime;
+
+                    return `
+                        <div class="comparison-row ${isNewPB ? 'new-pb-row' : ''}">
+                            <span class="comparison-exercise">${block.label}${isNewPB ? ' 🏆' : ''}</span>
+                            <span class="comparison-time comparison-current">${formatTime(currentTime, false)}</span>
+                            <span class="comparison-time comparison-pb">${pbTime ? formatTime(pbTime, false) : '-'}</span>
+                            <span class="delta ${delta.type}">${delta.formatted}</span>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+    `;
+
     return card;
 }
 
