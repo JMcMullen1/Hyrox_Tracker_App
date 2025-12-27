@@ -3,7 +3,7 @@
  * Handles caching for offline functionality
  */
 
-const CACHE_NAME = 'hyrox-tracker-v2';
+const CACHE_NAME = 'hyrox-tracker-v3';
 
 // Files to cache for offline use (relative paths for subdirectory deployment)
 const STATIC_ASSETS = [
@@ -26,9 +26,9 @@ const STATIC_ASSETS = [
     './js/screens/full-sim.js',
     './js/screens/custom.js',
     './js/screens/history.js',
-    './icons/icon.svg',
     './icons/icon-192.png',
-    './icons/icon-512.png'
+    './icons/icon-512.png',
+    './icons/Hyox_App_logo.png'
 ];
 
 // Install event - cache static assets
