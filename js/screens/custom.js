@@ -420,11 +420,15 @@ function startWorkout() {
         workoutActive = false;
         workoutComplete = true;
 
+        // Fetch PBs BEFORE updating them, so results can compare against previous PBs
+        const previousPBs = await getAllPersonalBests(currentCategory);
+
         await saveWorkoutSession(currentWorkout);
         await updatePBs();
         await clearStoredTimerState();
 
-        renderCompletionView();
+        // Show completion view with previous PBs for comparison
+        renderCompletionView(previousPBs);
     });
 
     workoutActive = true;
@@ -497,11 +501,15 @@ function renderActiveWorkout() {
 
 /**
  * Render completion view
+ * @param {Object} pbs - Previous personal bests for comparison (fetched before updating)
  */
-async function renderCompletionView() {
+async function renderCompletionView(pbs = null) {
     container.innerHTML = '';
 
-    const pbs = await getAllPersonalBests(currentCategory);
+    // If no PBs passed, fetch them (for page reload scenarios)
+    if (!pbs) {
+        pbs = await getAllPersonalBests(currentCategory);
+    }
 
     const completionDiv = document.createElement('div');
     completionDiv.className = 'text-center';
