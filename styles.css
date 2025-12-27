@@ -904,6 +904,55 @@ body {
     width: 24px;
 }
 
+/* Comparison Table Card */
+.comparison-table-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.comparison-summary {
+    display: flex;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    flex-wrap: wrap;
+}
+
+.summary-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.summary-badge.new-pb {
+    background: rgba(218, 165, 32, 0.2);
+    color: var(--color-gold);
+}
+
+.summary-badge.faster {
+    background: rgba(0, 200, 83, 0.15);
+    color: #00c853;
+}
+
+.summary-badge.slower {
+    background: rgba(255, 82, 82, 0.15);
+    color: #ff5252;
+}
+
+.comparison-table-scroll {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 350px;
+    -webkit-overflow-scrolling: touch;
+}
+
 /* Comparison Table */
 .comparison-table {
     width: 100%;
@@ -912,8 +961,8 @@ body {
 .comparison-row {
     display: grid;
     grid-template-columns: 1fr auto auto auto;
-    gap: var(--spacing-md);
-    padding: var(--spacing-sm) 0;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-xs);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     align-items: center;
 }
@@ -926,18 +975,33 @@ body {
     color: var(--text-muted);
     font-size: var(--font-size-xs);
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
+    position: sticky;
+    top: 0;
+    background: var(--bg-card);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 1;
+}
+
+.comparison-row.new-pb-row {
+    background: rgba(218, 165, 32, 0.08);
+    border-radius: var(--radius-sm);
 }
 
 .comparison-exercise {
     font-size: var(--font-size-sm);
     color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .comparison-time {
     font-family: 'SF Mono', 'Menlo', monospace;
     font-size: var(--font-size-sm);
     text-align: right;
+    min-width: 52px;
 }
 
 .comparison-pb {
@@ -946,6 +1010,13 @@ body {
 
 .comparison-current {
     color: var(--color-gold);
+}
+
+.comparison-row .delta {
+    min-width: 56px;
+    text-align: right;
+    font-size: var(--font-size-xs);
+    padding: 2px 6px;
 }
 
 /* History List */
