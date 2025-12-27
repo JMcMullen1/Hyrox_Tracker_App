@@ -385,6 +385,104 @@ export async function updateSimPB(category, totalTimeMs) {
     return updatePersonalBest(category, 'full_sim_total', totalTimeMs);
 }
 
+/**
+ * Delete a personal best
+ * @param {string} category - 'amateur' or 'pro'
+ * @param {string} exerciseId - Exercise ID
+ * @returns {Promise<void>}
+ */
+export async function deletePersonalBest(category, exerciseId) {
+    const key = getPBKey(category, exerciseId);
+    return remove(STORES.PERSONAL_BESTS, key);
+}
+
+/**
+ * Set personal best to a specific value (used during recalculation)
+ * @param {string} category - 'amateur' or 'pro'
+ * @param {string} exerciseId - Exercise ID
+ * @param {number} timeMs - Time in ms
+ * @returns {Promise<void>}
+ */
+export async function setPersonalBest(category, exerciseId, timeMs) {
+    const key = getPBKey(category, exerciseId);
+    await put(STORES.PERSONAL_BESTS, {
+        id: key,
+        category,
+        exerciseId,
+        bestTimeMs: timeMs,
+        achievedAt: new Date().toISOString()
+    });
+}
+
+/**
+ * Recalculate PBs after a workout deletion
+ * Scans all remaining workout sessions and updates PBs accordingly
+ * @param {string} category - 'amateur' or 'pro'
+ * @param {Function} getCanonicalExerciseId - Function to get canonical exercise ID from block
+ * @returns {Promise<void>}
+ */
+export async function recalculatePBsAfterDeletion(category, getCanonicalExerciseId) {
+    // Get all sessions for this category
+    const allSessions = await getAllWorkoutSessions();
+    const categorySessions = allSessions.filter(s => s.category === category);
+
+    // Build a map of best times for each exercise
+    const bestTimes = {};
+    let bestSimTotal = null;
+
+    for (const session of categorySessions) {
+        // Check for full sim PB
+        if (session.mode === 'sim' && session.totalTimeMs) {
+            if (bestSimTotal === null || session.totalTimeMs < bestSimTotal) {
+                bestSimTotal = session.totalTimeMs;
+            }
+        }
+
+        // Check each exercise block
+        if (session.blocks && session.blockTimesMs) {
+            for (let i = 0; i < session.blocks.length; i++) {
+                const block = session.blocks[i];
+                const time = session.blockTimesMs[i];
+
+                if (time && time > 0) {
+                    const exerciseId = getCanonicalExerciseId(block, category);
+                    if (exerciseId) {
+                        if (!bestTimes[exerciseId] || time < bestTimes[exerciseId]) {
+                            bestTimes[exerciseId] = time;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Get current PBs to see what needs to be updated or deleted
+    const currentPBs = await getAllPersonalBests(category);
+
+    // Update or delete each exercise PB
+    for (const exerciseId of Object.keys(currentPBs)) {
+        if (exerciseId === 'full_sim_total') continue; // Handle separately
+
+        if (bestTimes[exerciseId]) {
+            // Update PB to the new best time
+            await setPersonalBest(category, exerciseId, bestTimes[exerciseId]);
+        } else {
+            // No remaining sessions have this exercise - delete the PB
+            await deletePersonalBest(category, exerciseId);
+        }
+    }
+
+    // Handle full sim PB
+    const currentSimPB = await getSimPB(category);
+    if (currentSimPB !== null) {
+        if (bestSimTotal !== null) {
+            await setPersonalBest(category, 'full_sim_total', bestSimTotal);
+        } else {
+            await deletePersonalBest(category, 'full_sim_total');
+        }
+    }
+}
+
 // ============================================
 // Meta / Settings
 // ============================================

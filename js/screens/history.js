@@ -3,11 +3,12 @@
  * Shows workout history with filters and detail views
  */
 
-import { getAllWorkoutSessions, deleteWorkoutSession, getAllPersonalBests } from '../db.js';
+import { getAllWorkoutSessions, deleteWorkoutSession, getAllPersonalBests, recalculatePBsAfterDeletion } from '../db.js';
 import { formatLongTime, formatDateTime, getRelativeTime, sanitizeHTML } from '../utils.js';
 import { createResultsView } from '../components/results-card.js';
 import { confirmDelete } from '../components/modal.js';
 import { navigate } from '../router.js';
+import { getCanonicalExerciseId } from '../exercises.js';
 
 let container = null;
 let currentFilter = 'all';
@@ -159,6 +160,8 @@ function renderFilteredList() {
             const session = sessions.find(s => s.id === sessionId);
             if (session && await confirmDelete('this workout')) {
                 await deleteWorkoutSession(sessionId);
+                // Recalculate PBs from remaining workouts
+                await recalculatePBsAfterDeletion(session.category, getCanonicalExerciseId);
                 sessions = sessions.filter(s => s.id !== sessionId);
                 renderFilteredList();
             }
