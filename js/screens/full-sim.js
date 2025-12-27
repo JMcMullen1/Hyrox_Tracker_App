@@ -212,7 +212,10 @@ function startWorkout() {
         const previousSimPB = await import('../db.js').then(m => m.getSimPB(currentCategory));
         previousPBs['full_sim_total'] = previousSimPB;
 
-        // Save workout
+        // Store previous PBs with workout for history comparison
+        currentWorkout.previousPBs = previousPBs;
+
+        // Save workout (includes previousPBs for later viewing)
         await saveWorkoutSession(currentWorkout);
 
         // Update PBs (after fetching the previous ones)
@@ -305,11 +308,13 @@ function renderActiveWorkout() {
 async function renderCompletionView(pbs = null) {
     container.innerHTML = '';
 
-    // If no PBs passed, fetch them (for page reload scenarios)
+    // If no PBs passed, use stored previousPBs from workout or fetch current PBs
     if (!pbs) {
-        pbs = await getAllPersonalBests(currentCategory);
-        const simPB = await import('../db.js').then(m => m.getSimPB(currentCategory));
-        pbs['full_sim_total'] = simPB;
+        pbs = currentWorkout?.previousPBs || await getAllPersonalBests(currentCategory);
+        if (!currentWorkout?.previousPBs) {
+            const simPB = await import('../db.js').then(m => m.getSimPB(currentCategory));
+            pbs['full_sim_total'] = simPB;
+        }
     }
 
     // Show "See Results" button first
