@@ -80,11 +80,10 @@ async function renderDashboardContent() {
         // Build content
         let html = '';
 
-        // Logo placeholder
+        // Logo display
         html += `
             <div class="card text-center" style="padding: 24px;">
-                <div style="font-size: 48px; color: var(--color-gold);">H</div>
-                <div style="color: var(--text-muted); font-size: 12px; margin-top: 8px;">Your logo here</div>
+                <img src="https://i.postimg.cc/htq788Kc/Hyox-App-logo.png" alt="Hyrox Tracker" style="max-width: 200px; height: auto;">
             </div>
         `;
 
