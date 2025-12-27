@@ -83,7 +83,7 @@ async function renderDashboardContent() {
         // Logo display
         html += `
             <div class="card text-center" style="padding: 24px;">
-                <img src="https://i.postimg.cc/htq788Kc/Hyox-App-logo.png" alt="Hyrox Tracker" style="max-width: 200px; height: auto;">
+                <img src="icons/Hyox_App_logo.png" alt="Hyrox Tracker" style="max-width: 200px; height: auto;">
             </div>
         `;
 
