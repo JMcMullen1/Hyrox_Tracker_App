@@ -423,6 +423,10 @@ function startWorkout() {
         // Fetch PBs BEFORE updating them, so results can compare against previous PBs
         const previousPBs = await getAllPersonalBests(currentCategory);
 
+        // Store previous PBs with workout for history comparison
+        currentWorkout.previousPBs = previousPBs;
+
+        // Save workout (includes previousPBs for later viewing)
         await saveWorkoutSession(currentWorkout);
         await updatePBs();
         await clearStoredTimerState();
@@ -506,9 +510,9 @@ function renderActiveWorkout() {
 async function renderCompletionView(pbs = null) {
     container.innerHTML = '';
 
-    // If no PBs passed, fetch them (for page reload scenarios)
+    // If no PBs passed, use stored previousPBs from workout or fetch current PBs
     if (!pbs) {
-        pbs = await getAllPersonalBests(currentCategory);
+        pbs = currentWorkout?.previousPBs || await getAllPersonalBests(currentCategory);
     }
 
     const completionDiv = document.createElement('div');

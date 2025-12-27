@@ -208,8 +208,9 @@ async function showSessionDetail(sessionId) {
     `;
     container.appendChild(infoCard);
 
-    // Get PBs for comparison
-    const pbs = await getAllPersonalBests(session.category);
+    // Use stored previous PBs from session (for accurate comparison against PBs at time of workout)
+    // Fall back to current PBs for older workouts that don't have stored PBs
+    const pbs = session.previousPBs || await getAllPersonalBests(session.category);
 
     // Results view
     const resultsView = createResultsView(session, pbs);
