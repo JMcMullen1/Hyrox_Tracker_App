@@ -45,6 +45,9 @@ let currentWorkout = null;
 let blocksContainer = null;
 let stopwatchComponent = null;
 
+// Pending repeat workout data (set before navigation)
+let pendingRepeatWorkout = null;
+
 /**
  * Render the custom workout screen
  * @returns {HTMLElement} Screen element
@@ -60,7 +63,14 @@ export function render() {
  * Called after render
  */
 export async function onMount() {
-    currentCategory = await getToggleSetting('custom');
+    // Check for pending repeat workout
+    if (pendingRepeatWorkout) {
+        workoutBlocks = pendingRepeatWorkout.blocks;
+        currentCategory = pendingRepeatWorkout.category;
+        pendingRepeatWorkout = null; // Clear after loading
+    } else {
+        currentCategory = await getToggleSetting('custom');
+    }
 
     if (workoutActive || workoutComplete) {
         renderActiveWorkout();
@@ -576,4 +586,56 @@ async function updatePBs() {
             }
         }
     }
+}
+
+/**
+ * Set up a repeat workout from a previous session
+ * Call this before navigating to the custom screen
+ * @param {Object} session - Previous workout session to repeat
+ */
+export function setRepeatWorkout(session) {
+    if (!session || !session.blocks) return;
+
+    // Convert session blocks to builder-compatible format
+    const blocks = session.blocks.map(block => {
+        const converted = { ...block };
+
+        // Handle run blocks - convert to run_custom format for the builder
+        if (block.type === 'run') {
+            // Extract distance as number for the builder
+            let distance = 1000;
+            if (typeof block.distance === 'string') {
+                distance = parseInt(block.distance.replace(/[^\d]/g, '')) || 1000;
+            } else if (typeof block.distance === 'number') {
+                distance = block.distance;
+            }
+
+            converted.id = 'run_custom';
+            converted.distance = distance;
+            converted.label = `Run – ${distance}m`;
+        }
+
+        // Handle custom exercise blocks
+        if (block.type === 'custom') {
+            converted.id = 'custom';
+            converted.customName = block.label || block.customName || 'Custom Exercise';
+
+            // Extract numeric values from distance/weight strings
+            if (block.distance) {
+                const distNum = parseInt(String(block.distance).replace(/[^\d]/g, ''));
+                if (distNum) converted.customDistance = distNum;
+            }
+            if (block.weight) {
+                const weightNum = parseInt(String(block.weight).replace(/[^\d]/g, ''));
+                if (weightNum) converted.customWeight = weightNum;
+            }
+        }
+
+        return converted;
+    });
+
+    pendingRepeatWorkout = {
+        blocks,
+        category: session.category || 'amateur'
+    };
 }
