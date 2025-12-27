@@ -48,6 +48,10 @@ let currentWorkout = null;
 let blocksContainer = null;
 let stopwatchComponent = null;
 
+// Template editing state
+let editingTemplateId = null;
+let editingTemplateName = null;
+
 /**
  * Render the custom workout screen
  * @returns {HTMLElement} Screen element
@@ -125,16 +129,46 @@ async function renderBuilderView() {
     addBlockBtn.addEventListener('click', addBlock);
     container.appendChild(addBlockBtn);
 
-    // Action buttons
+    // Action buttons container
     const actions = document.createElement('div');
-    actions.className = 'stats-grid mt-md';
-    actions.innerHTML = `
-        <button class="btn btn-secondary" id="btn-save-template">Save Template</button>
-        <button class="btn btn-primary" id="btn-start-custom" ${workoutBlocks.length === 0 ? 'disabled' : ''}>Start Workout</button>
-    `;
+    actions.className = 'action-buttons mt-md';
+    actions.id = 'action-buttons';
     container.appendChild(actions);
 
-    document.getElementById('btn-save-template')?.addEventListener('click', saveAsTemplate);
+    renderActionButtons();
+}
+
+/**
+ * Render action buttons based on editing state
+ */
+function renderActionButtons() {
+    const actions = document.getElementById('action-buttons');
+    if (!actions) return;
+
+    if (editingTemplateId) {
+        // Editing a template - show update and save as new options
+        actions.innerHTML = `
+            <div class="template-actions-row">
+                <button class="btn btn-secondary" id="btn-update-template">Update Template</button>
+                <button class="btn btn-outline" id="btn-save-as-new">Save as New</button>
+            </div>
+            <button class="btn btn-primary btn-full mt-md" id="btn-start-custom" ${workoutBlocks.length === 0 ? 'disabled' : ''}>Start Workout</button>
+        `;
+
+        document.getElementById('btn-update-template')?.addEventListener('click', updateTemplate);
+        document.getElementById('btn-save-as-new')?.addEventListener('click', saveAsNewTemplate);
+    } else {
+        // Not editing - show regular save template option
+        actions.innerHTML = `
+            <div class="stats-grid">
+                <button class="btn btn-secondary" id="btn-save-template">Save Template</button>
+                <button class="btn btn-primary" id="btn-start-custom" ${workoutBlocks.length === 0 ? 'disabled' : ''}>Start Workout</button>
+            </div>
+        `;
+
+        document.getElementById('btn-save-template')?.addEventListener('click', saveAsTemplate);
+    }
+
     document.getElementById('btn-start-custom')?.addEventListener('click', startWorkout);
 }
 
@@ -154,19 +188,20 @@ async function renderTemplates() {
     }
 
     section.innerHTML = `
-        <div class="templates-title">Saved Templates</div>
+        <div class="templates-header">
+            <div class="templates-title">Saved Templates</div>
+        </div>
         ${categoryTemplates.map(t => `
-            <div class="template-card" data-template-id="${t.id}">
+            <div class="template-card ${editingTemplateId === t.id ? 'editing' : ''}" data-template-id="${t.id}">
                 <div class="template-info">
                     <div class="template-name">${sanitizeHTML(t.name)}</div>
-                    <div class="template-meta">${t.blocks.length} exercises</div>
+                    <div class="template-meta">${t.blocks.length} exercise${t.blocks.length !== 1 ? 's' : ''}</div>
                 </div>
                 <div class="template-actions">
-                    <button class="btn-icon" data-action="load" title="Load template">
+                    <button class="btn-icon" data-action="edit" title="Load & Edit">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="8 17 12 21 16 17"></polyline>
-                            <line x1="12" y1="12" x2="12" y2="21"></line>
-                            <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"></path>
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                         </svg>
                     </button>
                     <button class="btn-icon danger" data-action="delete" title="Delete template">
@@ -184,13 +219,11 @@ async function renderTemplates() {
     section.querySelectorAll('.template-card').forEach(card => {
         const templateId = card.dataset.templateId;
 
-        card.querySelector('[data-action="load"]')?.addEventListener('click', async (e) => {
+        card.querySelector('[data-action="edit"]')?.addEventListener('click', async (e) => {
             e.stopPropagation();
             const template = categoryTemplates.find(t => t.id === templateId);
             if (template) {
-                workoutBlocks = deepClone(template.blocks);
-                renderBlocksBuilder();
-                showToast('Template loaded!', 'success');
+                loadTemplateForEditing(template);
             }
         });
 
@@ -199,11 +232,81 @@ async function renderTemplates() {
             const template = categoryTemplates.find(t => t.id === templateId);
             if (template && await confirmDelete(template.name)) {
                 await deleteWorkoutTemplate(templateId);
+                // Clear editing state if we deleted the template being edited
+                if (editingTemplateId === templateId) {
+                    clearEditingState();
+                }
                 await renderTemplates();
                 showToast('Template deleted', 'success');
             }
         });
     });
+}
+
+/**
+ * Load a template for editing
+ */
+function loadTemplateForEditing(template) {
+    editingTemplateId = template.id;
+    editingTemplateName = template.name;
+    workoutBlocks = deepClone(template.blocks);
+    renderBlocksBuilder();
+    renderEditingBanner();
+    renderTemplates();
+    showToast(`Loaded "${template.name}" for editing`, 'success');
+}
+
+/**
+ * Clear the editing state
+ */
+function clearEditingState() {
+    editingTemplateId = null;
+    editingTemplateName = null;
+}
+
+/**
+ * Render editing banner when a template is loaded
+ */
+function renderEditingBanner() {
+    // Remove existing banner if any
+    const existingBanner = document.querySelector('.editing-banner');
+    if (existingBanner) {
+        existingBanner.remove();
+    }
+
+    if (!editingTemplateId) return;
+
+    const builderTitle = container.querySelector('.section-header');
+    if (!builderTitle) return;
+
+    const banner = document.createElement('div');
+    banner.className = 'editing-banner';
+    banner.innerHTML = `
+        <div class="editing-banner-content">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+            <span>Editing: <strong>${sanitizeHTML(editingTemplateName)}</strong></span>
+        </div>
+        <button class="editing-banner-close" title="Clear and start fresh">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+    `;
+
+    banner.querySelector('.editing-banner-close')?.addEventListener('click', () => {
+        clearEditingState();
+        workoutBlocks = [];
+        renderBlocksBuilder();
+        renderEditingBanner();
+        renderTemplates();
+        showToast('Cleared workout', 'success');
+    });
+
+    builderTitle.insertAdjacentElement('afterend', banner);
 }
 
 /**
@@ -417,16 +520,96 @@ async function saveAsTemplate() {
     const name = await prompt('Save Template', 'Enter a name for this workout template:', '', 'Template name');
 
     if (name) {
+        const newTemplateId = generateId();
         await saveWorkoutTemplate({
-            id: generateId(),
+            id: newTemplateId,
             name: name.trim(),
             category: currentCategory,
             blocks: deepClone(workoutBlocks),
             createdAt: new Date().toISOString()
         });
 
+        // Set as the template we're now editing
+        editingTemplateId = newTemplateId;
+        editingTemplateName = name.trim();
+
         await renderTemplates();
+        renderEditingBanner();
+        renderActionButtons();
         showToast('Template saved!', 'success');
+    }
+}
+
+/**
+ * Update the currently editing template
+ */
+async function updateTemplate() {
+    if (workoutBlocks.length === 0) {
+        showToast('Add some exercises first!', 'error');
+        return;
+    }
+
+    if (!editingTemplateId) {
+        showToast('No template selected to update', 'error');
+        return;
+    }
+
+    // Optionally allow renaming during update
+    const newName = await prompt(
+        'Update Template',
+        'Update the template name or keep it the same:',
+        editingTemplateName,
+        'Template name'
+    );
+
+    if (newName !== null) {
+        await saveWorkoutTemplate({
+            id: editingTemplateId,
+            name: newName.trim() || editingTemplateName,
+            category: currentCategory,
+            blocks: deepClone(workoutBlocks),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        });
+
+        editingTemplateName = newName.trim() || editingTemplateName;
+
+        await renderTemplates();
+        renderEditingBanner();
+        showToast('Template updated!', 'success');
+    }
+}
+
+/**
+ * Save current blocks as a new template (copy)
+ */
+async function saveAsNewTemplate() {
+    if (workoutBlocks.length === 0) {
+        showToast('Add some exercises first!', 'error');
+        return;
+    }
+
+    const suggestedName = editingTemplateName ? `${editingTemplateName} (copy)` : '';
+    const name = await prompt('Save as New Template', 'Enter a name for this new template:', suggestedName, 'Template name');
+
+    if (name) {
+        const newTemplateId = generateId();
+        await saveWorkoutTemplate({
+            id: newTemplateId,
+            name: name.trim(),
+            category: currentCategory,
+            blocks: deepClone(workoutBlocks),
+            createdAt: new Date().toISOString()
+        });
+
+        // Switch to editing the new template
+        editingTemplateId = newTemplateId;
+        editingTemplateName = name.trim();
+
+        await renderTemplates();
+        renderEditingBanner();
+        renderActionButtons();
+        showToast('Saved as new template!', 'success');
     }
 }
 
@@ -619,6 +802,7 @@ async function renderCompletionView() {
             workoutComplete = false;
             currentWorkout = null;
             workoutBlocks = [];
+            clearEditingState();
             navigate('dashboard');
         });
         container.appendChild(doneBtn);
@@ -634,6 +818,7 @@ async function renderCompletionView() {
         workoutComplete = false;
         currentWorkout = null;
         workoutBlocks = [];
+        clearEditingState();
         await renderBuilderView();
     });
     container.appendChild(newBtn);
