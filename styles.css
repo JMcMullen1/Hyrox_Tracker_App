@@ -135,6 +135,12 @@ body {
     gap: 2px;
 }
 
+.header-logo {
+    height: 50px;
+    width: auto;
+    object-fit: contain;
+}
+
 .logo-text {
     font-size: var(--font-size-xl);
     font-weight: 800;
