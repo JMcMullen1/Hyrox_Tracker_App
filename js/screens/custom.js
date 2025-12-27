@@ -7,9 +7,9 @@ import { createToggle } from '../components/toggle.js';
 import { createWorkoutBlockList, setBlockActive, setBlockCompleted, scrollToActiveBlock } from '../components/workout-block.js';
 import { createStopwatch } from '../components/stopwatch.js';
 import { createResultsView, createSeeResultsButton } from '../components/results-card.js';
-import { showStopWorkoutModal, prompt, confirm, confirmDelete } from '../components/modal.js';
+import { showStopWorkoutModal } from '../components/modal.js';
 import { CUSTOM_EXERCISE_OPTIONS, getCanonicalExerciseId } from '../exercises.js';
-import { generateId, deepClone, showToast, sanitizeHTML } from '../utils.js';
+import { generateId, deepClone, showToast } from '../utils.js';
 import { navigate } from '../router.js';
 import {
     initTimer,
@@ -31,9 +31,6 @@ import {
 } from '../timer.js';
 import {
     saveWorkoutSession,
-    saveWorkoutTemplate,
-    getAllWorkoutTemplates,
-    deleteWorkoutTemplate,
     updatePersonalBest,
     getAllPersonalBests,
     getToggleSetting
@@ -47,10 +44,6 @@ let workoutComplete = false;
 let currentWorkout = null;
 let blocksContainer = null;
 let stopwatchComponent = null;
-
-// Template editing state
-let editingTemplateId = null;
-let editingTemplateName = null;
 
 /**
  * Render the custom workout screen
@@ -90,19 +83,10 @@ async function renderBuilderView() {
         onChange: async (value) => {
             currentCategory = value;
             renderBlocksBuilder();
-            await renderTemplates();
-            await renderActionButtons();
+            renderActionButtons();
         }
     });
     container.appendChild(toggle);
-
-    // Saved Templates Section
-    const templatesSection = document.createElement('div');
-    templatesSection.className = 'templates-section';
-    templatesSection.id = 'templates-section';
-    container.appendChild(templatesSection);
-
-    await renderTemplates();
 
     // Builder Section Title
     const builderTitle = document.createElement('div');
@@ -136,235 +120,21 @@ async function renderBuilderView() {
     actions.id = 'action-buttons';
     container.appendChild(actions);
 
-    await renderActionButtons();
+    renderActionButtons();
 }
 
 /**
- * Render action buttons based on editing state
+ * Render action buttons
  */
-async function renderActionButtons() {
+function renderActionButtons() {
     const actions = document.getElementById('action-buttons');
     if (!actions) return;
 
-    // Get templates for the load dropdown
-    const templates = await getAllWorkoutTemplates();
-    const categoryTemplates = templates.filter(t => t.category === currentCategory);
-
-    if (editingTemplateId) {
-        // Editing a template - show update and save as new options
-        actions.innerHTML = `
-            <div class="template-actions-row">
-                <button class="btn btn-secondary" id="btn-update-template">Update Template</button>
-                <button class="btn btn-outline" id="btn-save-as-new">Save as New</button>
-            </div>
-            <button class="btn btn-primary btn-full mt-md" id="btn-start-custom" ${workoutBlocks.length === 0 ? 'disabled' : ''}>Start Workout</button>
-        `;
-
-        document.getElementById('btn-update-template')?.addEventListener('click', updateTemplate);
-        document.getElementById('btn-save-as-new')?.addEventListener('click', saveAsNewTemplate);
-    } else {
-        // Not editing - show regular save and load template options
-        actions.innerHTML = `
-            <div class="stats-grid">
-                <button class="btn btn-secondary" id="btn-save-template">Save Template</button>
-                <div class="load-dropdown-container">
-                    <button class="btn btn-outline" id="btn-load-template" ${categoryTemplates.length === 0 ? 'disabled' : ''}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="7 10 12 15 17 10"></polyline>
-                            <line x1="12" y1="15" x2="12" y2="3"></line>
-                        </svg>
-                        Load
-                    </button>
-                    <div class="load-dropdown-menu" id="load-dropdown-menu">
-                        ${categoryTemplates.length === 0 ?
-                            '<div class="load-dropdown-empty">No saved templates</div>' :
-                            categoryTemplates.map(t => `
-                                <button class="load-dropdown-item" data-template-id="${t.id}">
-                                    <span class="load-dropdown-item-name">${sanitizeHTML(t.name)}</span>
-                                    <span class="load-dropdown-item-meta">${t.blocks.length} exercise${t.blocks.length !== 1 ? 's' : ''}</span>
-                                </button>
-                            `).join('')
-                        }
-                    </div>
-                </div>
-            </div>
-            <button class="btn btn-primary btn-full mt-md" id="btn-start-custom" ${workoutBlocks.length === 0 ? 'disabled' : ''}>Start Workout</button>
-        `;
-
-        document.getElementById('btn-save-template')?.addEventListener('click', saveAsTemplate);
-
-        // Load dropdown functionality
-        const loadBtn = document.getElementById('btn-load-template');
-        const loadMenu = document.getElementById('load-dropdown-menu');
-
-        loadBtn?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            loadMenu?.classList.toggle('open');
-        });
-
-        // Close dropdown when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('.load-dropdown-container')) {
-                loadMenu?.classList.remove('open');
-            }
-        });
-
-        // Handle template selection from dropdown
-        loadMenu?.querySelectorAll('.load-dropdown-item').forEach(item => {
-            item.addEventListener('click', async () => {
-                const templateId = item.dataset.templateId;
-                const template = categoryTemplates.find(t => t.id === templateId);
-                if (template) {
-                    loadMenu.classList.remove('open');
-                    await loadTemplateForEditing(template);
-                }
-            });
-        });
-    }
+    actions.innerHTML = `
+        <button class="btn btn-primary btn-full" id="btn-start-custom" ${workoutBlocks.length === 0 ? 'disabled' : ''}>Start Workout</button>
+    `;
 
     document.getElementById('btn-start-custom')?.addEventListener('click', startWorkout);
-}
-
-/**
- * Render saved templates
- */
-async function renderTemplates() {
-    const section = document.getElementById('templates-section');
-    if (!section) return;
-
-    const templates = await getAllWorkoutTemplates();
-    const categoryTemplates = templates.filter(t => t.category === currentCategory);
-
-    if (categoryTemplates.length === 0) {
-        section.innerHTML = '';
-        return;
-    }
-
-    section.innerHTML = `
-        <div class="templates-header">
-            <div class="templates-title">Saved Templates</div>
-        </div>
-        ${categoryTemplates.map(t => `
-            <div class="template-card ${editingTemplateId === t.id ? 'editing' : ''}" data-template-id="${t.id}">
-                <div class="template-info">
-                    <div class="template-name">${sanitizeHTML(t.name)}</div>
-                    <div class="template-meta">${t.blocks.length} exercise${t.blocks.length !== 1 ? 's' : ''}</div>
-                </div>
-                <div class="template-actions">
-                    <button class="btn-icon" data-action="edit" title="Load & Edit">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                        </svg>
-                    </button>
-                    <button class="btn-icon danger" data-action="delete" title="Delete template">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-        `).join('')}
-    `;
-
-    // Add event listeners
-    section.querySelectorAll('.template-card').forEach(card => {
-        const templateId = card.dataset.templateId;
-
-        card.querySelector('[data-action="edit"]')?.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const template = categoryTemplates.find(t => t.id === templateId);
-            if (template) {
-                await loadTemplateForEditing(template);
-            }
-        });
-
-        card.querySelector('[data-action="delete"]')?.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const template = categoryTemplates.find(t => t.id === templateId);
-            if (template && await confirmDelete(template.name)) {
-                await deleteWorkoutTemplate(templateId);
-                // Clear editing state if we deleted the template being edited
-                if (editingTemplateId === templateId) {
-                    clearEditingState();
-                    renderEditingBanner();
-                }
-                await renderTemplates();
-                await renderActionButtons();
-                showToast('Template deleted', 'success');
-            }
-        });
-    });
-}
-
-/**
- * Load a template for editing
- */
-async function loadTemplateForEditing(template) {
-    editingTemplateId = template.id;
-    editingTemplateName = template.name;
-    workoutBlocks = deepClone(template.blocks);
-    renderBlocksBuilder();
-    renderEditingBanner();
-    await renderTemplates();
-    await renderActionButtons();
-    showToast(`Loaded "${template.name}" for editing`, 'success');
-}
-
-/**
- * Clear the editing state
- */
-function clearEditingState() {
-    editingTemplateId = null;
-    editingTemplateName = null;
-}
-
-/**
- * Render editing banner when a template is loaded
- */
-function renderEditingBanner() {
-    // Remove existing banner if any
-    const existingBanner = document.querySelector('.editing-banner');
-    if (existingBanner) {
-        existingBanner.remove();
-    }
-
-    if (!editingTemplateId) return;
-
-    const builderTitle = container.querySelector('.section-header');
-    if (!builderTitle) return;
-
-    const banner = document.createElement('div');
-    banner.className = 'editing-banner';
-    banner.innerHTML = `
-        <div class="editing-banner-content">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-            </svg>
-            <span>Editing: <strong>${sanitizeHTML(editingTemplateName)}</strong></span>
-        </div>
-        <button class="editing-banner-close" title="Clear and start fresh">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-        </button>
-    `;
-
-    banner.querySelector('.editing-banner-close')?.addEventListener('click', async () => {
-        clearEditingState();
-        workoutBlocks = [];
-        renderBlocksBuilder();
-        renderEditingBanner();
-        await renderTemplates();
-        await renderActionButtons();
-        showToast('Cleared workout', 'success');
-    });
-
-    builderTitle.insertAdjacentElement('afterend', banner);
 }
 
 /**
@@ -567,111 +337,6 @@ function updateStartButton() {
 }
 
 /**
- * Save current blocks as template
- */
-async function saveAsTemplate() {
-    if (workoutBlocks.length === 0) {
-        showToast('Add some exercises first!', 'error');
-        return;
-    }
-
-    const name = await prompt('Save Template', 'Enter a name for this workout template:', '', 'Template name');
-
-    if (name) {
-        const newTemplateId = generateId();
-        await saveWorkoutTemplate({
-            id: newTemplateId,
-            name: name.trim(),
-            category: currentCategory,
-            blocks: deepClone(workoutBlocks),
-            createdAt: new Date().toISOString()
-        });
-
-        // Set as the template we're now editing
-        editingTemplateId = newTemplateId;
-        editingTemplateName = name.trim();
-
-        await renderTemplates();
-        renderEditingBanner();
-        await renderActionButtons();
-        showToast('Template saved!', 'success');
-    }
-}
-
-/**
- * Update the currently editing template
- */
-async function updateTemplate() {
-    if (workoutBlocks.length === 0) {
-        showToast('Add some exercises first!', 'error');
-        return;
-    }
-
-    if (!editingTemplateId) {
-        showToast('No template selected to update', 'error');
-        return;
-    }
-
-    // Optionally allow renaming during update
-    const newName = await prompt(
-        'Update Template',
-        'Update the template name or keep it the same:',
-        editingTemplateName,
-        'Template name'
-    );
-
-    if (newName !== null) {
-        await saveWorkoutTemplate({
-            id: editingTemplateId,
-            name: newName.trim() || editingTemplateName,
-            category: currentCategory,
-            blocks: deepClone(workoutBlocks),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        });
-
-        editingTemplateName = newName.trim() || editingTemplateName;
-
-        await renderTemplates();
-        renderEditingBanner();
-        showToast('Template updated!', 'success');
-    }
-}
-
-/**
- * Save current blocks as a new template (copy)
- */
-async function saveAsNewTemplate() {
-    if (workoutBlocks.length === 0) {
-        showToast('Add some exercises first!', 'error');
-        return;
-    }
-
-    const suggestedName = editingTemplateName ? `${editingTemplateName} (copy)` : '';
-    const name = await prompt('Save as New Template', 'Enter a name for this new template:', suggestedName, 'Template name');
-
-    if (name) {
-        const newTemplateId = generateId();
-        await saveWorkoutTemplate({
-            id: newTemplateId,
-            name: name.trim(),
-            category: currentCategory,
-            blocks: deepClone(workoutBlocks),
-            createdAt: new Date().toISOString()
-        });
-
-        // Switch to editing the new template
-        editingTemplateId = newTemplateId;
-        editingTemplateName = name.trim();
-
-        await renderTemplates();
-        renderEditingBanner();
-        await renderActionButtons();
-        showToast('Saved as new template!', 'success');
-    }
-}
-
-/**
  * Start the custom workout
  */
 function startWorkout() {
@@ -860,7 +525,6 @@ async function renderCompletionView() {
             workoutComplete = false;
             currentWorkout = null;
             workoutBlocks = [];
-            clearEditingState();
             navigate('dashboard');
         });
         container.appendChild(doneBtn);
@@ -876,7 +540,6 @@ async function renderCompletionView() {
         workoutComplete = false;
         currentWorkout = null;
         workoutBlocks = [];
-        clearEditingState();
         await renderBuilderView();
     });
     container.appendChild(newBtn);
