@@ -91,6 +91,7 @@ async function renderBuilderView() {
             currentCategory = value;
             renderBlocksBuilder();
             await renderTemplates();
+            await renderActionButtons();
         }
     });
     container.appendChild(toggle);
@@ -288,8 +289,10 @@ async function renderTemplates() {
                 // Clear editing state if we deleted the template being edited
                 if (editingTemplateId === templateId) {
                     clearEditingState();
+                    renderEditingBanner();
                 }
                 await renderTemplates();
+                await renderActionButtons();
                 showToast('Template deleted', 'success');
             }
         });
@@ -351,12 +354,13 @@ function renderEditingBanner() {
         </button>
     `;
 
-    banner.querySelector('.editing-banner-close')?.addEventListener('click', () => {
+    banner.querySelector('.editing-banner-close')?.addEventListener('click', async () => {
         clearEditingState();
         workoutBlocks = [];
         renderBlocksBuilder();
         renderEditingBanner();
-        renderTemplates();
+        await renderTemplates();
+        await renderActionButtons();
         showToast('Cleared workout', 'success');
     });
 
